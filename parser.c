@@ -161,3 +161,15 @@ void classifyTokens(struct Token** tokens, int tokenCount){
 		}
 	}
 }
+
+int numCommands(struct Token** tokens, int tokenCount){
+	int cmdCnt = 0;
+	for(int i = 0; i < tokenCount; i++){
+		if(tokens[i]->type == 0){
+			cmdCnt++;
+		}
+	}
+
+	return cmdCnt;
+
+}
