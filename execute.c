@@ -8,7 +8,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 	//If no metachars, execute normally
 	if(numPipes == 0 && numInRedirs == 0 && numOutRedirs == 0 && backgroundFlag == 0){
 		char** argv = malloc(sizeof(char)*100);
-		for(int i = 1; i < tokenCount; i++){
+		for(int i = 0; i < tokenCount; i++){
 			argv[i] = tokens[i]->value;
 		}
 
@@ -20,6 +20,9 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 
 		//Execute command
 		executeArgs(argv, cmd);
+		printf("\n");
+
+		return;
 	}
 
 	//Starting index of the array that we've already processed
@@ -39,7 +42,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		char** argv1 = malloc(sizeof(char)*100);
 		char** argv2 = malloc(sizeof(char)*100);
 
-		for(int i = startIndex+1; i < *metaIndexp; i++){
+		for(int i = startIndex; i < *metaIndexp; i++){
 			argv1[i] = tokens[i]->value;
 		}
 		//Terminate array
@@ -80,6 +83,8 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		//*startIndexp += *metaIndexp do within functions BUT we have to figure out how to do multiple pipes
 
 	//}close while loop
+
+	return;
 
 }
 
