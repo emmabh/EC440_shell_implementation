@@ -92,12 +92,12 @@ int main(int argc, char** argv){
 		//Check for double << >>, print error 
 		for(int j = 0; j < tokenCount; j++){
 			if(tokens[j]->value[0] == '>'){
-				if(strcmp("<<", tokens[j]->value)){
+				if(!strcmp("<<", tokens[j]->value)){
 					printf("ERROR: Too many redirections \n");
 					continue;
 				}
 			}else if(tokens[j]->value[0] == '>'){
-				if(strcmp(">>", tokens[j]->value)){
+				if(!strcmp(">>", tokens[j]->value)){
 					printf("ERROR: Too many redirections \n");
 					continue;
 				}

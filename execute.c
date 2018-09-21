@@ -3,6 +3,7 @@
 #include<string.h>
 #include <stdlib.h>
 #include<unistd.h>
+#include <fcntl.h> // for open
 
 void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPipes, int numInRedirs, int numOutRedirs, int backgroundFlag){
 	//If no metachars, execute normally
@@ -54,25 +55,28 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		}
 
 		//If it's a pipe, act accordingly
-		if(tokens[metaIndex]->type == 2){
+		if(tokens[*metaIndexp]->type == 2){
 			//Find the next metachar as well, and make a second argv array
 		}
 		//If other, act accordingly
-		else if(tokens[metaIndex]->type == 3){
+		else if(tokens[*metaIndexp]->type == 3){
 			//&
-			if(tokens[metaIndex]->value[0] == '&'){
+			if(tokens[*metaIndexp]->value[0] == '&'){
 
 			// In and out redirect
 			}else if(tokenCount > 3 && tokens[metaIndex]->value[0] == '<' && tokens[tokenCount - 2]->value[0] == '>'){
 				//Find the next metachar as well, and make a second argv array
 
 			//<
-			}else if(tokens[metaIndex]->value[0] == '<'){
+			}else if(tokens[*metaIndexp]->value[0] == '<'){
 				//Find the next metachar as well, and make a second argv array
 
 			//>
 			}else{
 				//Find the next metachar as well, and make a second argv array
+
+				executeArgsOutRedir(tokens, startIndexp, metaIndexp, argv1, argv2);
+
 
 			}
 
@@ -166,7 +170,35 @@ void executeArgsInRedir(struct Token** tokens){
 
 }
 
-void executeArgsOutRedir(struct Token** tokens){
+void executeArgsOutRedir(struct Token** tokens, int * startIndexp, int *metaIndexp, char** argv1, char** argv2){
+	//Fork a child
+    pid_t pid = fork();  
+  
+    if (pid == -1) { 
+        printf("ERROR: Child could not be forked \n"); 
+        return; 
+    } else if (pid == 0) { 
+
+    	int fd1 = open((tokens[*metaIndexp + 1]->value), O_RDWR|O_CREAT|O_APPEND, 0600);
+
+		if(dup2(fd1, fileno(stdout)) == -1){
+			printf("ERROR: Could not redirect stdout\n");
+			return;
+		}
+
+		close(fd1);
+
+        if (execvp(argv1[0], argv1) < 0) { 
+            printf("ERROR: Could not execute command \n"); 
+        } 
+
+        exit(0); 
+    } else { 
+        // Wait for child to terminate
+        wait(NULL);  
+        return; 
+    } 
+		
 
 }
 
