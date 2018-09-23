@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include "parser.h"
 #include "execute.h"
+#include<unistd.h>
+#include <fcntl.h> // for open
 #define DELIM " <>&|\t\r\n\a"
 
 /*Types of tokens
@@ -14,7 +16,18 @@
 
 int main(int argc, char** argv){
 	int k = 0;
+
+	int out_orig = dup(1);
+	int in_orig = dup(0);
+
+
 	while(k < 1){
+
+		dup2(out_orig, 1);
+		close(out_orig);
+
+		dup2(in_orig, 0);
+		close(in_orig);
 
 		int numPipes = 0;
 		int numInRedirs = 0;
@@ -51,6 +64,18 @@ int main(int argc, char** argv){
 
 		char input[512];
 		fgets(input, 512, stdin);
+		input[strlen(input)-1] = '\0';
+
+		//If nothing entered reprompt
+		if(input[0] == '\0'){
+			continue;
+		}
+
+		//If non alphabetic character is entered reprompt
+		char c = input[0];
+		if(!(c>='a' && c<='z') || (c>='A' && c<='Z')){
+			continue;
+		}
 
 		//Parse and make array of tokens with descriptors
 		struct Token** tokens = malloc(64 * sizeof(struct Token*));

@@ -6,11 +6,6 @@
 
 
 void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPipes, int numInRedirs, int numOutRedirs, int backgroundFlag);
-void executeArgsPipe(struct Token** tokens, int * startIndexp, int *metaIndexp, char** argv, char** argv2);
-void executeArgsInRedir(struct Token** tokens);
-void executeArgsOutRedir(struct Token** tokens, int * startIndexp, int *metaIndexp, char** argv1, char** argv2);
-void executeArgsInOutRedir(struct Token** tokens);
-void executeArgsBackground(struct Token** tokens);
 void executeArgs(char** argv, char* cmd);
 int findNextMetacharIndex(struct Token** tokens, int startIndex, int tokenCount);
 
