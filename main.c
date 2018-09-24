@@ -62,6 +62,7 @@ int main(int argc, char** argv){
 				fflush(stdout);
 		}
 
+		//Get input from user
 		char input[512];
 		fgets(input, 512, stdin);
 		input[strlen(input)-1] = '\0';
@@ -71,7 +72,7 @@ int main(int argc, char** argv){
 			continue;
 		}
 
-		//If non alphabetic character is entered reprompt
+		//If non alphabetic character is entered as first character, reprompt
 		char c = input[0];
 		if(!(c>='a' && c<='z') || (c>='A' && c<='Z')){
 			continue;
@@ -133,13 +134,12 @@ int main(int argc, char** argv){
 		if (tokens[tokenCount - 1]->value[0] == '&') {
             backgroundFlag = 1;
 
-            //Delete it from tokens
+            //Delete it from tokens for execution
             tokens[tokenCount-1] = NULL;
             tokenCount--;
         }
 
 		//Making pipes, children, args & executing them all
-
 		if (tokenCount > 0) {	
       		executeLine(tokens, cmdCount, tokenCount, numPipes, numInRedirs, numOutRedirs, backgroundFlag);
     	}

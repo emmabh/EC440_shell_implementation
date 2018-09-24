@@ -6,8 +6,7 @@
 #include <fcntl.h> // for open
 
 
-//TODO: IF THE & FLAG, run all this in the background
-//TODO:
+//TODO: IF THE & FLAG, run all this in the background should be good
 
 
 void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPipes, int numInRedirs, int numOutRedirs, int backgroundFlag){
@@ -52,15 +51,12 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 	//Out redirection file id
 	int outFid;
 
-	//File redirection in
+	//File id if in redirection leads into a pipe
 	int extInFid = 0;
 
 	//Pipe file ids
 	int pfids[2];
 
-	//If pipes, initialize the pipe
-	
-	
 	
 	//Keep cycling through commands until we are at the end of the loop
 	while(startIndex < tokenCount){
@@ -68,7 +64,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		lastMetaIndex = metaIndex;
 		metaIndex = findNextMetacharIndex(tokens, *startIndexp, tokenCount);
 
-		//Place all strings up to the metacharacter in an argv array for the execvp
+		//Place all strings up to the metacharacter in an argv array for execution
 		char** argv = malloc(sizeof(char)*100);
 
 		for(int i = startIndex; i < metaIndex; i++){
@@ -77,7 +73,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		//Terminate array
 		argv[metaIndex] = NULL;
 
-		//If we've reached the last set of arguments and there are no more metachars
+		//If reached the last set of arguments and there are no more metachars
 		if(metaIndex >= tokenCount){
 			if(tokens[lastMetaIndex]->value[0] != '>' && tokens[lastMetaIndex]->value[0] != '<'){
 				executeArgs(argv, tokens[startIndex]->value, backgroundFlag);
@@ -87,27 +83,29 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		}
 
 
-		//If it's a pipe, act accordingly
+		//If the next metacharacter is a pipe
 		else if(tokens[metaIndex]->type == 2){
-			//use array of pipe file ids, keep iterating until no more pipes
-			printf("PIPING\n");
 			pid_t pid;
 			int inFid = 0;
 
-			
+			//Handle multiple pipes in a row
 			while(pipeCnt <= numPipes){
 
+				//Open pipe
 				if (pipe(pfids) < 0){
 					printf("ERROR: Pipe could not be initialized\n");
 					return;
 				}
 
+				//Put all arguments into an array for execution
 				char** argv1 = malloc(sizeof(char)*100);
 				for(int i = 0; i < metaIndex-startIndex; i++){
 					argv1[i] = tokens[i+ startIndex]->value;
 				}
+				//Terminate array
 				argv1[metaIndex] = NULL;
 
+				//Fork a new process
 				pid = fork();
 
 				if(pid < 0){
@@ -116,9 +114,9 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 				}else if(pid == 0){
 					//Child process
 
-					//Get input from last command OR last pipe
+					//Get input from last command OR last pipe (If first command, inFid is 0)
 					if(extInFid > 0 && pipeCnt == 0){
-						inFid = pfids[0];
+						inFid = extInFid;
 					}
 					
 					if(dup2(inFid, 0) < 0){
@@ -140,7 +138,6 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 
 						//If there is an out redirection after the last pipe
 						if(numOutRedirs == 1){
-							printf("OPENING OUT REDIRECT FILE\n");
 							outFid = open((tokens[metaIndex + 1]->value), O_RDWR|O_CREAT|O_APPEND, 0600);
 
 							if(dup2(outFid, 1) < 0){
@@ -148,7 +145,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 								return;
 							}
 
-							//After out redirect, nothing else should execute
+							//After out redirect, nothing else should execute (Hard coded)
 							startIndex = tokenCount;
 
 						}
@@ -159,11 +156,12 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 					exit(EXIT_FAILURE);
 				}else{
 					//Parent
-					//Done in the background
+					//If the command is not being done in the background
 					if(backgroundFlag!= 1){
 						wait(NULL);
 					}
 					
+					//Close end of pipe not using
 					close(pfids[1]);
 					close(outFid);
 					inFid = pfids[0];
@@ -171,6 +169,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 					pipeCnt++;
 					startIndex = metaIndex + 1;
 
+					//Find next meta index if there are more pipes to come
 					if(pipeCnt != numPipes+1){
 						metaIndex = findNextMetacharIndex(tokens, startIndex, tokenCount);
 					} 
@@ -182,7 +181,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		continue;
 
 		}
-		//If other, act accordingly
+		//If metacharacter other than pipe, act accordingly
 		else if(tokens[metaIndex]->type == 3 && tokens[metaIndex]->value[0] == '<'){
 			if(startIndex != 0){
 				printf("ERROR: In redirection needs to be the first argument\n");
@@ -204,14 +203,17 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 						}
 						//If next one pipe, put output of this file into the input of the pipe
 						else if(tokens[findNextMetacharIndex(tokens, metaIndex + 1, tokenCount)]->value[0] == '|'){
-							printf("TRYING TO PIPE OUTPUT\n");
-							if(dup2(pfids[1], 1) < 0){
+							if(dup2(extInFid, fileno(stdout)) < 0){
 								printf("ERROR: Could not pipe output\n" );
 								return;
 							}
 
-							close(pfids[1]);
-							extInFid = 1;
+							close(extInFid);
+
+							//SHORTCOMING: This hasn't worked yet (cat: stdin: bad file descriptior)
+							//Adjust start index to the pipe + 1 & adjust number of pipes because we're already taking care of one
+							startIndex = findNextMetacharIndex(tokens, metaIndex + 1, tokenCount) + 1;
+							numPipes--;
 					
 						}
 
@@ -252,12 +254,10 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 
 		}else{
 			//Out redir
-			//Error check if the next metachar index is not & or null this is incorrect
+			//Error check if the next metachar index is not null this is incorrect
 			if(findNextMetacharIndex(tokens, metaIndex + 1, tokenCount) < tokenCount){
-				if(tokens[findNextMetacharIndex(tokens, metaIndex + 1, tokenCount)]->value[0] != '&'){
 					printf("ERROR: Out redirection must be the last metacharacter\n");
 					return;
-				}
 			}
 
 			if(numPipes > 0 || numInRedirs == 1){
