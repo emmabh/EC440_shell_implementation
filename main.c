@@ -132,6 +132,10 @@ int main(int argc, char** argv){
 		//Check if &
 		if (tokens[tokenCount - 1]->value[0] == '&') {
             backgroundFlag = 1;
+
+            //Delete it from tokens
+            tokens[tokenCount-1] = NULL;
+            tokenCount--;
         }
 
 		//Making pipes, children, args & executing them all

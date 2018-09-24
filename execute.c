@@ -5,15 +5,15 @@
 #include<unistd.h>
 #include <fcntl.h> // for open
 
-//IF ONE FAILS DO THEY ALL FAIL TA
-//TODO: IF THE & FLAG, run all this in the background
 
-//IDEA: UNTIL PIPES ARE DONE, DO THEM IN A WHILE LOOOOOP
+//TODO: IF THE & FLAG, run all this in the background
+//TODO:
 
 
 void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPipes, int numInRedirs, int numOutRedirs, int backgroundFlag){
 	//If no metachars, execute normally
-	if(numPipes == 0 && numInRedirs == 0 && numOutRedirs == 0 && backgroundFlag == 0){
+	if(numPipes == 0 && numInRedirs == 0 && numOutRedirs == 0){
+
 		char** argv = malloc(sizeof(char)*100);
 		for(int i = 0; i < tokenCount; i++){
 			argv[i] = tokens[i]->value;
@@ -26,7 +26,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		argv[tokenCount + 1] = NULL;
 
 		//Execute command
-		executeArgs(argv, cmd);
+		executeArgs(argv, cmd, backgroundFlag);
 		printf("\n");
 
 		return;
@@ -78,9 +78,9 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		argv[metaIndex] = NULL;
 
 		//If we've reached the last set of arguments and there are no more metachars
-		if(metaIndex >= tokenCount || tokens[metaIndex]->value[0] == '&'){
+		if(metaIndex >= tokenCount){
 			if(tokens[lastMetaIndex]->value[0] != '>' && tokens[lastMetaIndex]->value[0] != '<'){
-				executeArgs(argv, tokens[startIndex]->value);
+				executeArgs(argv, tokens[startIndex]->value, backgroundFlag);
 			}
 
 			return;
@@ -159,8 +159,11 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 					exit(EXIT_FAILURE);
 				}else{
 					//Parent
+					//Done in the background
+					if(backgroundFlag!= 1){
+						wait(NULL);
+					}
 					
-					wait(NULL);
 					close(pfids[1]);
 					close(outFid);
 					inFid = pfids[0];
@@ -239,8 +242,11 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 
 					exit(0); 
 			} else { 
-					        // Wait for child to terminate
-					 wait(NULL);
+					 // Wait for child to terminate if not being done in the background
+
+					if(backgroundFlag != 1){
+						 wait(NULL);
+					}
 			} 
 			
 
@@ -284,8 +290,11 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 			    exit(0); 
 			    
 		    } else { 
-		        // Wait for child to terminate
-		        wait(NULL);  
+		        // Wait for child to terminate if not being done in the background
+		        if(backgroundFlag != 1){
+		        	wait(NULL); 
+		        }
+		         
 		    } 
 
 		}
@@ -297,7 +306,6 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 	}
 
 	//Restore stdin and stdout
-
 	dup2(out_orig, 1);
 	close(out_orig);
 
@@ -309,7 +317,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 
 }
 
-void executeArgs(char** argv, char* cmd) 
+void executeArgs(char** argv, char* cmd, int backgroundFlag) 
 { 
     //Fork a child
     pid_t pid = fork();  
@@ -324,131 +332,15 @@ void executeArgs(char** argv, char* cmd)
         exit(0); 
     } else { 
         // Wait for child to terminate
-        wait(NULL);  
+        if(backgroundFlag != 1){
+        	wait(NULL);  
+        }
+        
         return; 
     } 
 }
 
-/*
 
-void executeArgsPipe(struct Token** tokens, int *startIndexp, int *metaIndexp, char** argv1, char** argv2){
-	int pipefd[2];
-	pid_t p1, p2;
-
-	if (pipe(pipefd) < 0){
-		printf("ERROR: Pipe could not be initialized\n");
-		return;
-	}
-
-	p1 = fork();
-	if(p1 < 0){
-		printf("ERROR: Could not fork\n");
-		return;
-	}
-
-	if(p1 == 0){
-		//Executing  child 1, write at the end
-		close(pipefd[0]);
-		dup2(pipefd[1], fileno(stdout));
-		close(pipefd[1]);
-
-		if(execvp(tokens[(*startIndexp)]->value, argv1) < 0){
-			printf("ERROR: Could not execute command\n");
-			exit(0);
-		}
-	}else{
-		//Executing parent
-		p2 = fork();
-
-		if(p2 < 0){
-			printf("ERROR: Could not fork\n");
-			return;
-		}
-
-		//Execute child 2 read at end
-
-		if(p2 == 0){
-			close(pipefd[1]);
-			dup2(pipefd[0], fileno(stdin));
-			close(pipefd[0]);
-
-			if(execvp(tokens[(*metaIndexp)+1]->value, argv2) < 0){
-				printf("ERROR: Could not execute command\n");
-				exit(0);
-			}
-		}else{
-			//Parent waiting for 2 kids
-			wait(NULL);
-			wait(NULL);
-		}
-
-	}
-
-	//TODO: Check if next arg is pipe or redir and act accordingly
-}
-
-void executeArgsInRedir(struct Token** tokens, int * startIndexp, int *metaIndexp, char** argv1){
-	pid_t pid = fork();  
-  
-    if (pid == -1) { 
-        printf("ERROR: Child could not be forked \n"); 
-        return; 
-    } else if (pid == 0) { 
-
-    	int fd = open((tokens[*metaIndexp + 1]->value), O_RDWR|O_CREAT|O_APPEND, 0600);
-
-		if(dup2(fd, fileno(stdin)) == -1){
-			printf("ERROR: Could not redirect stdout\n");
-			return;
-		}
-
-		close(fd);
-
-        if (execvp(argv1[0], argv1) < 0) { 
-            printf("ERROR: Could not execute command \n"); 
-        } 
-
-        exit(0); 
-    } else { 
-        // Wait for child to terminate
-        wait(NULL);  
-        return; 
-    } 
-}
-
-void executeArgsOutRedir(struct Token** tokens, int startIndex, int metaIndex, char** argv1){
-	//Fork a child
-    pid_t pid = fork();  
-  
-    if (pid == -1) { 
-        printf("ERROR: Child could not be forked \n"); 
-        return; 
-    } else if (pid == 0) { 
-
-    	int fd = open((tokens[metaIndex + 1]->value), O_RDWR|O_CREAT|O_APPEND, 0600);
-
-		if(dup2(fd, fileno(stdout)) == -1){
-			printf("ERROR: Could not redirect stdout\n");
-			return;
-		}
-
-		close(fd);
-
-        if (execvp(argv1[0], argv1) < 0) { 
-            printf("ERROR: Could not execute command \n"); 
-        } 
-
-        exit(0); 
-    } else { 
-        // Wait for child to terminate
-        wait(NULL);  
-        return; 
-    } 
-		
-
-}
-
-*/
 int findNextMetacharIndex(struct Token** tokens, int startIndex, int tokenCount){
 	int metaIndex = startIndex;
 
