@@ -58,6 +58,8 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 	//Pipe file ids
 	int pfids[2];
 
+	//If pipes, initialize the pipe
+	
 	
 	
 	//Keep cycling through commands until we are at the end of the loop
@@ -88,22 +90,23 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 		//If it's a pipe, act accordingly
 		else if(tokens[metaIndex]->type == 2){
 			//use array of pipe file ids, keep iterating until no more pipes
+			printf("PIPING\n");
 			pid_t pid;
 			int inFid = 0;
+
+			
 			while(pipeCnt <= numPipes){
 
-				//int nextMetaIndex = metaIndex = findNextMetacharIndex(tokens, metaIndex + 1, tokenCount);
+				if (pipe(pfids) < 0){
+					printf("ERROR: Pipe could not be initialized\n");
+					return;
+				}
 
 				char** argv1 = malloc(sizeof(char)*100);
 				for(int i = 0; i < metaIndex-startIndex; i++){
 					argv1[i] = tokens[i+ startIndex]->value;
 				}
 				argv1[metaIndex] = NULL;
-
-				if (pipe(pfids) < 0){
-					printf("ERROR: Pipe could not be initialized\n");
-					return;
-				}
 
 				pid = fork();
 
@@ -115,16 +118,14 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 
 					//Get input from last command OR last pipe
 					if(extInFid > 0 && pipeCnt == 0){
-						if(dup2(extInFid, 0) < 0){
-							printf("ERROR: Could not complete pipe\n");
-							return;
-						}
-					}else{
-						if(dup2(inFid, 0) < 0){
-							printf("ERROR: Could not complete pipe\n");
-							return;
-						}
+						inFid = pfids[0];
 					}
+					
+					if(dup2(inFid, 0) < 0){
+						printf("ERROR: Could not complete pipe\n");
+						return;
+					}
+					
 					
 
 					//If not the last pipe
@@ -158,6 +159,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 					exit(EXIT_FAILURE);
 				}else{
 					//Parent
+					
 					wait(NULL);
 					close(pfids[1]);
 					close(outFid);
@@ -200,10 +202,13 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 						//If next one pipe, put output of this file into the input of the pipe
 						else if(tokens[findNextMetacharIndex(tokens, metaIndex + 1, tokenCount)]->value[0] == '|'){
 							printf("TRYING TO PIPE OUTPUT\n");
-							if(dup2(extInFid, fileno(stdout)) < 0){
+							if(dup2(pfids[1], 1) < 0){
 								printf("ERROR: Could not pipe output\n" );
 								return;
 							}
+
+							close(pfids[1]);
+							extInFid = 1;
 					
 						}
 
@@ -285,7 +290,7 @@ void executeLine(struct Token** tokens, int cmdCount, int tokenCount, int numPip
 
 		}
 
-		lastStartIndex = startIndex;
+
 		startIndex = metaIndex + 1;
 
 
